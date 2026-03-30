@@ -3,6 +3,22 @@ from pawpal_system import Owner, Pet, Task, Scheduler, save_data, load_data
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
+# ---------------------------------------------------------------------------
+# Display helpers
+# ---------------------------------------------------------------------------
+PRIORITY_EMOJI = {"high": "🔴 High", "medium": "🟡 Medium", "low": "🟢 Low"}
+SLOT_EMOJI = {"morning": "🌅 morning", "afternoon": "☀️ afternoon", "evening": "🌙 evening", "any": "🔄 any"}
+
+def task_rows(tasks):
+    """Return display-ready dicts with priority and slot emoji for st.dataframe."""
+    rows = []
+    for t in tasks:
+        d = t.to_dict()
+        d["priority"] = PRIORITY_EMOJI.get(t.priority, t.priority)
+        d["time_slot"] = SLOT_EMOJI.get(t.time_slot, t.time_slot)
+        rows.append(d)
+    return rows
+
 st.title("🐾 PawPal+")
 st.caption("A smart pet care planner that sorts, filters, and checks for scheduling conflicts.")
 
@@ -115,7 +131,7 @@ if all_tasks:
 
     if sorted_filtered:
         st.caption(f"{len(sorted_filtered)} task(s) — sorted by time slot")
-        st.dataframe([t.to_dict() for t in sorted_filtered], use_container_width=True)
+        st.dataframe(task_rows(sorted_filtered), use_container_width=True)
     else:
         st.info("No tasks match the selected filters.")
 
@@ -171,7 +187,7 @@ if st.button("Generate schedule", type="primary"):
             if slot_tasks:
                 scheduled_any = True
                 st.markdown(f"**{slot_labels[slot]}**")
-                st.dataframe([t.to_dict() for t in slot_tasks], use_container_width=True)
+                st.dataframe(task_rows(slot_tasks), use_container_width=True)
 
         if not scheduled_any:
             st.info("No tasks could be scheduled within the available time.")
@@ -185,7 +201,7 @@ if st.button("Generate schedule", type="primary"):
         # Skipped — didn't fit
         if plan.skipped_tasks:
             with st.expander(f"Skipped — didn't fit ({len(plan.skipped_tasks)})"):
-                st.dataframe([t.to_dict() for t in plan.skipped_tasks], use_container_width=True)
+                st.dataframe(task_rows(plan.skipped_tasks), use_container_width=True)
 
         # Conflict warnings
         if plan.conflicts:

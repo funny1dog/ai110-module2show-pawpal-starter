@@ -406,11 +406,13 @@ class Scheduler:
 
         Stage 2 — Sorting:
             Due tasks are sorted by a five-key tuple:
-              (slot_order, frequency_order, effective_priority, category_order, duration)
-            - slot_order:       morning=0, afternoon=1, evening=2, any=3
+              (effective_priority, slot_order, frequency_order, category_order, duration)
+            - effective_priority: HIGH tasks always come before MEDIUM and LOW.
+                                  Tasks whose title matches a pet's special_needs are
+                                  promoted to 'high' regardless of their set priority.
+            - slot_order:       within a priority group, morning=0, afternoon=1,
+                                evening=2, any=3
             - frequency_order:  daily=0, other=1  (daily tasks run before weekly)
-            - effective_priority: tasks whose title matches an owner pet's special_needs
-                                  are promoted to 'high' regardless of their set priority
             - category_order:   health → nutrition → exercise → grooming → enrichment
             - duration:         shorter tasks break ties within the same category
 
@@ -437,13 +439,15 @@ class Scheduler:
         due_tasks = [t for t in self.tasks if not t.completed and t.is_due_today()]
         skipped_recurring = [t for t in self.tasks if not t.completed and not t.is_due_today()]
 
-        # Sort: time slot → daily-first → boosted priority → category → duration
+        # Sort: priority first → time slot → daily-first frequency → category → duration
+        # High-priority tasks are always scheduled before medium/low, regardless of slot.
+        # Within a priority group, tasks are ordered by their time slot (morning first).
         sorted_tasks = sorted(
             due_tasks,
             key=lambda t: (
+                PRIORITY_ORDER[effective_priority(t)],
                 SLOT_ORDER[t.time_slot],
                 0 if t.frequency == "daily" else 1,
-                PRIORITY_ORDER[effective_priority(t)],
                 CATEGORY_ORDER.get(t.category, len(CATEGORY_ORDER)),
                 t.duration_minutes,
             )
@@ -466,9 +470,10 @@ class Scheduler:
         boosted = [t.title for t in self.tasks if t.title.lower() in special_needs and t.priority != "high"]
         reasoning = (
             f"Recurring tasks not yet due were excluded ({len(skipped_recurring)} skipped). "
-            f"Remaining tasks sorted by time slot, then daily-first frequency, then priority"
-            + (f" (special-needs boost applied to: {boosted})" if boosted else "")
-            + f", then category, then duration. "
+            f"Remaining tasks sorted by priority first (high → medium → low)"
+            + (f" — special-needs boost applied to: {boosted}" if boosted else "")
+            + f", then by time slot (morning → afternoon → evening), "
+            f"then daily-first frequency, then category, then duration. "
             f"{len(scheduled)} scheduled, {len(skipped)} skipped (time), {len(conflicts)} conflict(s) flagged."
         )
         return DailyPlan(
