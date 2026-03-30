@@ -62,6 +62,35 @@ Two helper methods make it easy to inspect the task pool without generating a fu
 - `Scheduler.sort_by_time()` — returns tasks ordered by slot (morning → afternoon → evening → unslotted).
 - `Scheduler.filter_tasks(pet_name, completed)` — returns a filtered subset by pet and/or completion status.
 
+## Testing PawPal+
+
+### Running the tests
+
+```bash
+python -m pytest tests/test_pawpal.py -v
+```
+
+All 27 tests should pass in under a second.
+
+### What the tests cover
+
+| Area | Tests | What is verified |
+| --- | --- | --- |
+| **Sorting** | 3 | Tasks added out of order come out morning → afternoon → evening → any; `sort_by_time()` does not mutate the pool; the full plan also honours slot order |
+| **Recurrence logic** | 6 | `is_due_today()` boundary conditions for daily (same day, next day) and weekly (3 days, 7 days); `complete_task()` sets `next_due` via `timedelta`; pool size stays constant after completing a recurring task |
+| **Conflict detection** | 5 | No false positives when tasks are in different slots; `CONFLICT` fires for same pet in same slot; `WARNING` fires for different pets in same slot; `time_slot="any"` tasks are never flagged; conflicts appear in `plan.display()` output |
+| **Edge cases** | 6 | Pet with no tasks; `available_minutes=0`; duplicate task title raises `ValueError`; `filter_tasks` by pet name; `filter_tasks` by completion status; special-needs boost schedules a health task before other medium-priority tasks |
+
+### Confidence level
+
+#### 4 / 5 stars
+
+The core scheduling logic — sorting, recurrence, conflict detection, and priority boosting — is fully covered by tests that exercise both happy paths and edge cases. The rating is not 5 stars because the following areas are not yet tested:
+
+- The Streamlit UI layer (`app.py`) has no automated tests; UI behaviour is verified manually only.
+- `DailyPlan.display()` formatting is spot-checked in one test but not exhaustively.
+- Database or file persistence is not implemented, so there are no persistence tests.
+
 ### Suggested workflow
 
 1. Read the scenario carefully and identify requirements and edge cases.
