@@ -12,76 +12,78 @@
 
 **a. Initial design**
 
-The system is built around four main objects:
+The design uses five classes. `Owner` and `Pet` are pure data holders that represent the people and animals involved. `Task` models a single care activity. `Scheduler` contains the planning logic. `DailyPlan` is the output object the UI displays.
 
-**Owner**
-- Attributes: `name` (str), `available_minutes` (int), `preferences` (list of str — e.g., prefers morning walks)
-- Methods: `get_available_time()` → returns how many minutes are free today; `update_preferences(prefs)` → updates the preference list
+**Owner** — holds the context that constrains the schedule.
+- Attributes: `name`, `available_minutes`, `preferences`, `pet` (Owner owns the Pet)
+- No behavior methods; its data is read directly by the Scheduler.
 
-**Pet**
-- Attributes: `name` (str), `species` (str), `special_needs` (list of str — e.g., "takes medication at noon")
-- Methods: `get_profile()` → returns a summary dict used by the scheduler to inform task selection
+**Pet** — holds the pet's profile, referenced through Owner.
+- Attributes: `name`, `species`, `special_needs`
+- No behavior methods; its data informs which tasks the Scheduler considers.
 
-**Task**
-- Attributes: `title` (str), `duration_minutes` (int), `priority` (str: "low"/"medium"/"high"), `category` (str — e.g., "exercise", "nutrition", "medical")
-- Methods: `is_high_priority()` → bool; `to_dict()` → serializable dict for display
+**Task** — represents one care activity to be scheduled.
+- Attributes: `title`, `duration_minutes`, `priority` ("low"/"medium"/"high"), `category`
+- `is_high_priority()` → convenience check used during sorting
+- `to_dict()` → serializes the task for display in the UI
 
-**Scheduler**
-- Attributes: `owner` (Owner), `pet` (Pet), `tasks` (list of Task)
-- Methods: `add_task(task)` → adds a task to the pool; `remove_task(title)` → removes by title; `generate_plan()` → returns a `DailyPlan` by selecting and ordering tasks that fit within `owner.available_minutes`, prioritizing by priority then duration
+**Scheduler** — the planning engine; owns the task pool and produces the plan.
+- Attributes: `owner`, `tasks`
+- `add_task(task)` / `remove_task(title)` → manage the task pool
+- `generate_plan()` → selects and orders tasks that fit within `owner.available_minutes`, ranked by priority then duration; returns a `DailyPlan`
 
-**DailyPlan**
-- Attributes: `scheduled_tasks` (list of Task in order), `total_minutes` (int), `skipped_tasks` (list of Task), `reasoning` (str)
-- Methods: `display()` → returns a formatted string listing each task, why it was included, and what was skipped and why
-
-Relationships: `Scheduler` owns one `Owner` and one `Pet`, and holds a collection of `Task` objects. `Scheduler.generate_plan()` produces a `DailyPlan`.
+**DailyPlan** — the read-only output of `generate_plan()`.
+- Attributes: `scheduled_tasks`, `total_minutes`, `skipped_tasks`, `reasoning`
+- `display()` → returns a formatted string of the plan for the UI
 
 **UML Class Diagram:**
 
 ```mermaid
 classDiagram
     class Owner {
-        +String name
+        +str name
         +int available_minutes
-        +List~String~ preferences
+        +list preferences
         +Pet pet
     }
 
     class Pet {
-        +String name
-        +String species
-        +List~String~ special_needs
+        +str name
+        +str species
+        +list special_needs
     }
 
     class Task {
-        +String title
+        +str title
         +int duration_minutes
-        +String priority
-        +String category
+        +str priority
+        +str category
         +is_high_priority() bool
         +to_dict() dict
     }
 
     class Scheduler {
         +Owner owner
-        +List~Task~ tasks
-        +add_task(task: Task) None
-        +remove_task(title: String) None
+        +list tasks
+        +add_task(task) None
+        +remove_task(title) None
         +generate_plan() DailyPlan
     }
 
     class DailyPlan {
-        +List~Task~ scheduled_tasks
+        +Owner owner
+        +list scheduled_tasks
         +int total_minutes
-        +List~Task~ skipped_tasks
-        +String reasoning
-        +display() String
+        +list skipped_tasks
+        +str reasoning
+        +display() str
     }
 
     Owner "1" --> "1" Pet : owns
     Scheduler "1" --> "1" Owner : uses
     Scheduler "1" --> "*" Task : manages
     Scheduler ..> DailyPlan : creates
+    DailyPlan "1" --> "1" Owner : references
     DailyPlan "1" ..> "*" Task : references
 ```
 
@@ -89,8 +91,15 @@ classDiagram
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
+Four changes were made after reviewing the initial design for missing relationships and logic bottlenecks:
+
+1. **Added `priority` validation to `Task`** — the initial design stored `priority` as a plain string with no guard. Any typo (e.g. `"urgent"`, `"HIGH"`) would silently pass and sort incorrectly. A module-level `VALID_PRIORITIES` constant and a `ValueError` on `__init__` catch bad values at construction time rather than at scheduling time.
+
+2. **Added `owner` reference to `DailyPlan`** — the plan had no way to identify whose schedule it was. Without this, `display()` could not say "Jordan's plan for Mochi." `DailyPlan.__init__` now accepts an `owner` parameter, and the UML relationship was updated to reflect this.
+
+3. **Added uniqueness enforcement to `Scheduler.add_task()`** — the original flat list allowed duplicate task titles. A second `add_task()` call with the same title would create a silent duplicate, and `remove_task()` would only delete the first match. The method now raises `ValueError` if a task with the same title already exists.
+
+4. **Added `available_minutes` validation to `Owner`** — a value of `0` or negative would cause `generate_plan()` to schedule nothing with no feedback. `Owner.__init__` now raises `ValueError` for negative values, making the failure explicit at the point of bad input.
 
 ---
 
