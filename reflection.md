@@ -138,6 +138,16 @@ The scheduler considers five constraints, applied in this order during sorting:
 
 Time was chosen as the top constraint because it is the hard outer limit — no matter how important a task is, it cannot be scheduled if it does not fit within `available_minutes`. Every other constraint exists to decide the order in which tasks compete for that budget.
 
+**c. Third algorithmic capability — composite effort scoring**
+
+Beyond sorting and conflict detection, the system includes a `DailyPlan.effort_score()` method that rates how demanding a generated plan is on a 0–100 scale and maps it to a human-readable label (Light, Moderate, Demanding, Heavy). The score is built from three independent components:
+
+- **Time utilization (0–40 pts):** `total_minutes / available_minutes × 40`. A plan that consumes all available time scores the full 40 points.
+- **Priority weight (0–40 pts):** each scheduled task contributes 3 pts (high), 1 pt (medium), or 0 pts (low). The raw sum is scaled by 4 and capped at 40 so a single high-priority task doesn't dominate.
+- **Task variety (0–20 pts):** 5 pts per unique category in the scheduled list, capped at 20. A plan covering health, nutrition, exercise, and enrichment scores higher than one that repeats the same category four times.
+
+This is useful because two plans can have the same total minutes but very different difficulty — ten low-priority enrichment tasks is a lighter day than four high-priority health tasks even if the clock time is identical. The score gives the owner an at-a-glance sense of what they are committing to before they start.
+
 **b. Tradeoffs**
 
 The scheduler uses a **greedy algorithm**: it works through the sorted task list from top to bottom and adds each task to the plan if it fits, skipping it permanently if it does not. This means a large high-priority task can consume most of the budget and leave no room for several smaller medium-priority tasks that together would have provided more total value.

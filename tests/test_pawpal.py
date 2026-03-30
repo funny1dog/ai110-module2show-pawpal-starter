@@ -330,3 +330,97 @@ def test_special_needs_boost_schedules_before_lower_priority():
     plan = scheduler.generate_plan()
     titles = [t.title for t in plan.scheduled_tasks]
     assert titles.index("Joint Supplement") < titles.index("Brushing")
+
+
+# ---------------------------------------------------------------------------
+# Effort scoring
+# ---------------------------------------------------------------------------
+
+def test_effort_score_empty_plan_is_light():
+    """An empty plan always returns score 0 and label 'Light'."""
+    owner = Owner(name="Jordan", available_minutes=60)
+    scheduler = Scheduler(owner=owner)
+    plan = scheduler.generate_plan()
+    result = plan.effort_score()
+
+    assert result["score"] == 0
+    assert result["label"] == "Light"
+
+
+def test_effort_score_zero_available_minutes_is_light():
+    """A plan with available_minutes=0 returns score 0 without dividing by zero."""
+    task = Task(title="Walk", duration_minutes=30, priority="high")
+    owner = Owner(name="Jordan", available_minutes=0)
+    scheduler = Scheduler(owner=owner)
+    scheduler.add_task(task)
+    plan = scheduler.generate_plan()
+    result = plan.effort_score()
+
+    assert result["score"] == 0
+    assert result["label"] == "Light"
+
+
+def test_effort_score_has_three_breakdown_keys():
+    """effort_score() always returns all three breakdown components."""
+    task = Task(title="Walk", duration_minutes=20, priority="high", category="exercise")
+    scheduler = make_scheduler(task, available_minutes=60)
+    plan = scheduler.generate_plan()
+    result = plan.effort_score()
+
+    assert set(result["breakdown"].keys()) == {"time_utilization", "priority_weight", "task_variety"}
+
+
+def test_effort_score_increases_with_more_high_priority_tasks():
+    """A plan with more high-priority tasks scores higher than one with low-priority tasks."""
+    high1 = Task(title="Meds", duration_minutes=10, priority="high", category="health")
+    high2 = Task(title="Walk", duration_minutes=10, priority="high", category="exercise")
+    low1 = Task(title="Play", duration_minutes=10, priority="low", category="enrichment")
+    low2 = Task(title="Nap", duration_minutes=10, priority="low", category="general")
+
+    sched_high = make_scheduler(high1, high2, available_minutes=60)
+    sched_low = make_scheduler(low1, low2, available_minutes=60)
+
+    score_high = sched_high.generate_plan().effort_score()["score"]
+    score_low = sched_low.generate_plan().effort_score()["score"]
+
+    assert score_high > score_low
+
+
+def test_effort_score_increases_with_task_variety():
+    """A plan covering more categories scores higher than one repeating the same category."""
+    varied = [
+        Task(title="Meds", duration_minutes=10, priority="medium", category="health"),
+        Task(title="Feeding", duration_minutes=10, priority="medium", category="nutrition"),
+        Task(title="Walk", duration_minutes=10, priority="medium", category="exercise"),
+        Task(title="Grooming", duration_minutes=10, priority="medium", category="grooming"),
+    ]
+    repetitive = [
+        Task(title="Walk A", duration_minutes=10, priority="medium", category="exercise"),
+        Task(title="Walk B", duration_minutes=10, priority="medium", category="exercise"),
+        Task(title="Walk C", duration_minutes=10, priority="medium", category="exercise"),
+        Task(title="Walk D", duration_minutes=10, priority="medium", category="exercise"),
+    ]
+
+    score_varied = make_scheduler(*varied, available_minutes=120).generate_plan().effort_score()["score"]
+    score_repetitive = make_scheduler(*repetitive, available_minutes=120).generate_plan().effort_score()["score"]
+
+    assert score_varied > score_repetitive
+
+
+def test_effort_score_label_reflects_score():
+    """The label returned matches the score's band."""
+    task = Task(title="Walk", duration_minutes=5, priority="low", category="exercise")
+    scheduler = make_scheduler(task, available_minutes=120)
+    plan = scheduler.generate_plan()
+    result = plan.effort_score()
+
+    score = result["score"]
+    label = result["label"]
+    if score <= 25:
+        assert label == "Light"
+    elif score <= 50:
+        assert label == "Moderate"
+    elif score <= 75:
+        assert label == "Demanding"
+    else:
+        assert label == "Heavy"

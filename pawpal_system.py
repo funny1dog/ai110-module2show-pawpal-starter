@@ -162,6 +162,72 @@ class DailyPlan:
         self.total_minutes = sum(t.duration_minutes for t in scheduled_tasks)
         self.reasoning = reasoning
 
+    def effort_score(self) -> dict:
+        """Return a composite effort score (0–100) rating how demanding this plan is.
+
+        The score is built from three independent components:
+
+        1. Time utilization (0–40 pts)
+           total_minutes / available_minutes × 40.
+           A plan that uses all available time scores the full 40.
+
+        2. Priority weight (0–40 pts)
+           Each scheduled task contributes points based on its priority:
+             high → 3 pts,  medium → 1 pt,  low → 0 pts.
+           The raw sum is scaled (× 4) and capped at 40 so a single
+           high-priority task doesn't dominate the score.
+
+        3. Task variety (0–20 pts)
+           5 pts per unique category present in the scheduled list, capped at 20.
+           A plan covering health, nutrition, exercise, and enrichment scores
+           higher than one that repeats the same category four times.
+
+        Score labels:
+            0–25  → "Light"
+            26–50 → "Moderate"
+            51–75 → "Demanding"
+            76–100 → "Heavy"
+
+        Returns a dict with keys: score, label, breakdown.
+        Never raises — returns score 0 / label "Light" for an empty plan.
+        """
+        if not self.scheduled_tasks or self.owner.available_minutes == 0:
+            return {"score": 0, "label": "Light",
+                    "breakdown": {"time_utilization": 0, "priority_weight": 0, "task_variety": 0}}
+
+        # Component 1: time utilization
+        time_score = round((self.total_minutes / self.owner.available_minutes) * 40)
+
+        # Component 2: priority weight
+        priority_points = {"high": 3, "medium": 1, "low": 0}
+        raw_priority = sum(priority_points[t.priority] for t in self.scheduled_tasks)
+        priority_score = min(40, raw_priority * 4)
+
+        # Component 3: task variety
+        unique_categories = len({t.category for t in self.scheduled_tasks})
+        variety_score = min(20, unique_categories * 5)
+
+        total = time_score + priority_score + variety_score
+
+        if total <= 25:
+            label = "Light"
+        elif total <= 50:
+            label = "Moderate"
+        elif total <= 75:
+            label = "Demanding"
+        else:
+            label = "Heavy"
+
+        return {
+            "score": total,
+            "label": label,
+            "breakdown": {
+                "time_utilization": time_score,
+                "priority_weight": priority_score,
+                "task_variety": variety_score,
+            },
+        }
+
     def display(self) -> str:
         """Return a formatted string summary of the daily plan grouped by time slot."""
         lines = [f"=== {self.owner.name}'s Daily Plan ==="]

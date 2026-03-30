@@ -148,6 +148,16 @@ if st.button("Generate schedule", type="primary"):
         st.markdown(f"### {owner.name}'s Daily Plan")
         st.caption(f"Budget: {plan.total_minutes} / {owner.available_minutes} min used")
 
+        # Effort score
+        effort = plan.effort_score()
+        label_color = {"Light": "🟢", "Moderate": "🟡", "Demanding": "🟠", "Heavy": "🔴"}
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Day Load", f"{label_color[effort['label']]} {effort['label']}")
+        col2.metric("Effort Score", f"{effort['score']} / 100")
+        col3.metric("Time Utilization", f"{effort['breakdown']['time_utilization']} pts")
+        col4.metric("Priority Weight", f"{effort['breakdown']['priority_weight']} pts")
+        st.progress(effort["score"] / 100)
+
         # Scheduled tasks grouped by time slot
         slots = ["morning", "afternoon", "evening", "any"]
         slot_labels = {"morning": "Morning", "afternoon": "Afternoon",

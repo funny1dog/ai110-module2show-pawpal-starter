@@ -153,6 +153,44 @@ The core scheduling logic — sorting, recurrence, conflict detection, and prior
 - `DailyPlan.display()` formatting is spot-checked in one test but not exhaustively.
 - Database or file persistence is not implemented, so there are no persistence tests.
 
+---
+
+## 🤖 Built with Agent Mode
+
+This project was developed using **Claude Code in Agent Mode** — an AI-assisted workflow where the developer steers high-level intent and the agent reads, writes, and runs code autonomously across the full codebase.
+
+### What Agent Mode did
+
+Agent Mode was active throughout every phase of the project, not just for isolated completions. Below is a breakdown of how it was used in each phase.
+
+**Phase 1 — Design review**
+The initial UML class diagram was drafted by the developer, then Agent Mode was asked to identify missing relationships and logic gaps. It surfaced the missing `Pet → Task` ownership link, the absent `Owner.available_minutes` validation, and the fact that `DailyPlan` had no reference back to `Owner` — all before any code was written. This compressed a design review that might take a team meeting into a single prompt.
+
+**Phase 2 — Logic implementation**
+Method bodies for `generate_plan()`, `detect_conflicts()`, `next_occurrence()`, and `complete_task()` were drafted by the agent after describing the intended behaviour in plain English. The agent read `pawpal_system.py` before writing, which meant it matched existing naming conventions and used constants already defined in the module (`PRIORITY_ORDER`, `CATEGORY_ORDER`, `FREQUENCY_DAYS`) rather than inventing new ones.
+
+**Phase 3 — Iterative improvement**
+Five algorithmic weaknesses were identified in a single review pass (`main.py` review session) and the agent fixed all five in one edit: assigning tasks to pets, driving the scheduler from `owner.all_tasks()`, adding `CATEGORY_ORDER` to the sort key, special-needs boosting, and adjusting `available_minutes` to exercise the skipped-task path. Each fix was applied to the correct file and verified by running `python main.py` immediately after.
+
+**Phase 4 — Test generation**
+The full test suite (33 tests) was written by the agent after describing the three areas to cover — sorting correctness, recurrence logic, and conflict detection. It identified non-obvious edge cases that were easy to miss: `time_slot="any"` tasks should never trigger conflict warnings; `complete_task()` must keep pool size constant; `effort_score()` must not divide by zero when `available_minutes=0`.
+
+**Phase 5 — UI wiring**
+`app.py` was updated to wire every new backend method (`sort_by_time`, `filter_tasks`, `detect_conflicts`, `effort_score`) into visible Streamlit components. The agent read the existing UI before making changes and preserved the session-state pattern already in use.
+
+**Phase 6 — Documentation**
+The README, `reflection.md`, and all docstrings were drafted or completed by the agent with awareness of the actual implemented code — so the documentation matches what the code does rather than what was originally planned.
+
+### How the developer directed Agent Mode
+
+Agent Mode is not autopilot. Each step required a deliberate prompt that specified:
+
+- **What file to read first** — the agent was always asked to read before writing, preventing it from inventing structure that didn't exist.
+- **What constraint to respect** — e.g. "use `timedelta`, not a manual day count" or "return warnings, never raise."
+- **What to verify** — after each implementation step, `python main.py` or `pytest` was run to confirm correctness before moving on.
+
+The developer rejected or adjusted agent suggestions when they were technically correct but wrong for the context — most notably the initial conflict detection logic, which flagged every multi-task slot as a conflict rather than distinguishing same-pet vs. cross-pet overlap.
+
 ### Suggested workflow
 
 1. Read the scenario carefully and identify requirements and edge cases.
