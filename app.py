@@ -1,5 +1,5 @@
 import streamlit as st
-from pawpal_system import Owner, Pet, Task, Scheduler
+from pawpal_system import Owner, Pet, Task, Scheduler, save_data, load_data
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -16,7 +16,8 @@ owner_name = st.text_input("Owner name", value="Jordan")
 available_minutes = st.number_input("Available minutes today", min_value=0, max_value=1440, value=120)
 
 if "owner" not in st.session_state:
-    st.session_state.owner = Owner(name=owner_name, available_minutes=available_minutes)
+    loaded = load_data()
+    st.session_state.owner = loaded if loaded else Owner(name=owner_name, available_minutes=available_minutes)
 
 st.divider()
 
@@ -33,6 +34,7 @@ with col2:
 if st.button("Add pet"):
     pet = Pet(name=pet_name, species=species)
     st.session_state.owner.add_pet(pet)
+    save_data(st.session_state.owner)
     st.success(f"Added {pet_name} ({species}) to your household.")
 
 if st.session_state.owner.pets:
@@ -74,6 +76,7 @@ if st.session_state.owner.pets:
             )
             pet = next(p for p in st.session_state.owner.pets if p.name == selected_pet)
             pet.add_task(task)
+            save_data(st.session_state.owner)
             st.success(f"Added '{task_title}' to {selected_pet}.")
         except ValueError as e:
             st.error(str(e))

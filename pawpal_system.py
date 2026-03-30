@@ -1,4 +1,6 @@
+import json
 from datetime import date, timedelta
+from pathlib import Path
 
 VALID_PRIORITIES = {"low", "medium", "high"}
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
@@ -141,6 +143,7 @@ class Task:
             "frequency": self.frequency,
             "completed": self.completed,
             "last_done": str(self.last_done) if self.last_done else None,
+            "next_due": str(self.next_due) if self.next_due else None,
         }
 
 
@@ -476,3 +479,98 @@ class Scheduler:
             conflicts=conflicts,
             reasoning=reasoning,
         )
+
+
+# ---------------------------------------------------------------------------
+# Persistence helpers
+# ---------------------------------------------------------------------------
+
+def save_data(owner: Owner, path: str = "data.json") -> None:
+    """Serialize the owner, all pets, and all their tasks to a JSON file.
+
+    The file is written atomically — Path.write_text replaces the previous
+    version in one call so a crash mid-write cannot leave a partial file.
+
+    Schema:
+        {
+          "owner": {
+            "name": str,
+            "available_minutes": int,
+            "preferences": list[str],
+            "pets": [
+              {
+                "name": str,
+                "species": str,
+                "special_needs": list[str],
+                "tasks": [ <Task.to_dict() output> ... ]
+              }
+            ]
+          }
+        }
+    """
+    data = {
+        "owner": {
+            "name": owner.name,
+            "available_minutes": owner.available_minutes,
+            "preferences": owner.preferences,
+            "pets": [
+                {
+                    "name": pet.name,
+                    "species": pet.species,
+                    "special_needs": pet.special_needs,
+                    "tasks": [t.to_dict() for t in pet.tasks],
+                }
+                for pet in owner.pets
+            ],
+        }
+    }
+    Path(path).write_text(json.dumps(data, indent=2))
+
+
+def load_data(path: str = "data.json") -> Owner | None:
+    """Load and reconstruct an Owner with all pets and tasks from a JSON file.
+
+    Returns None (instead of raising) in every failure case:
+        - file not found
+        - file contains invalid JSON
+        - required keys are missing
+        - a Task field value is invalid (e.g. bad priority)
+
+    Date fields ("last_done", "next_due") are parsed with date.fromisoformat();
+    a None value in JSON becomes None on the Task object.
+    """
+    try:
+        raw = json.loads(Path(path).read_text())
+        owner_data = raw["owner"]
+
+        pets = []
+        for pet_data in owner_data.get("pets", []):
+            pet = Pet(
+                name=pet_data["name"],
+                species=pet_data["species"],
+                special_needs=pet_data.get("special_needs", []),
+            )
+            for td in pet_data.get("tasks", []):
+                task = Task(
+                    title=td["title"],
+                    duration_minutes=td["duration_minutes"],
+                    priority=td["priority"],
+                    category=td.get("category", "general"),
+                    frequency=td.get("frequency", "daily"),
+                    time_slot=td.get("time_slot", "any"),
+                    last_done=date.fromisoformat(td["last_done"]) if td.get("last_done") else None,
+                )
+                task.completed = td.get("completed", False)
+                if td.get("next_due"):
+                    task.next_due = date.fromisoformat(td["next_due"])
+                pet.add_task(task)
+            pets.append(pet)
+
+        return Owner(
+            name=owner_data["name"],
+            available_minutes=owner_data["available_minutes"],
+            pets=pets,
+            preferences=owner_data.get("preferences", []),
+        )
+    except (FileNotFoundError, KeyError, json.JSONDecodeError, ValueError):
+        return None

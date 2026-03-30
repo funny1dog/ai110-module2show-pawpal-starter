@@ -1,0 +1,61 @@
+{
+  "owner": {
+    "name": "Jordan",
+    "available_minutes": 120,
+    "preferences": [],
+    "pets": [
+      {
+        "name": "Mochi",
+        "species": "dog",
+        "special_needs": [
+          "joint supplement"
+        ],
+        "tasks": [
+          {
+            "title": "Morning Walk",
+            "pet": "Mochi",
+            "time_slot": "morning",
+            "duration_minutes": 30,
+            "priority": "high",
+            "category": "exercise",
+            "frequency": "daily",
+            "completed": false,
+            "last_done": null,
+            "next_due": null
+          },
+          {
+            "title": "Joint Supplement",
+            "pet": "Mochi",
+            "time_slot": "morning",
+            "duration_minutes": 5,
+            "priority": "medium",
+            "category": "health",
+            "frequency": "daily",
+            "completed": false,
+            "last_done": null,
+            "next_due": null
+          }
+        ]
+      },
+      {
+        "name": "Luna",
+        "species": "cat",
+        "special_needs": [],
+        "tasks": [
+          {
+            "title": "Feeding",
+            "pet": "Luna",
+            "time_slot": "morning",
+            "duration_minutes": 10,
+            "priority": "high",
+            "category": "nutrition",
+            "frequency": "daily",
+            "completed": false,
+            "last_done": null,
+            "next_due": null
+          }
+        ]
+      }
+    ]
+  }
+}
