@@ -32,6 +32,36 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+## Smarter Scheduling
+
+The scheduling logic in `pawpal_system.py` goes beyond a simple priority sort. Here is what it does and why.
+
+**Time-slot ordering**
+Each `Task` has a `time_slot` (`morning`, `afternoon`, `evening`, or `any`). The scheduler always places morning tasks before afternoon tasks before evening tasks, giving the plan a natural daily flow regardless of the order tasks were added.
+
+**Recurring task filtering**
+Tasks carry a `frequency` (`daily` or `weekly`) and a `last_done` date. Before scheduling, the `Scheduler` calls `Task.is_due_today()` on every task and silently excludes anything that has already been done within its recurrence window. Excluded tasks are listed separately in the plan as "Skipped (not due today)" so the owner can see them without acting on them.
+
+**Automatic next occurrence**
+When `Scheduler.complete_task(title)` is called, it marks the task done and — for daily/weekly tasks — immediately creates a replacement using `Task.next_occurrence()`. The replacement's `next_due` date is computed with Python's `timedelta` (`today + 1 day` for daily, `today + 7 days` for weekly), so the task reappears in the plan exactly when it should.
+
+**Special-needs priority boost**
+If a `Pet` lists a condition in `special_needs` (e.g. `"joint supplement"`), any task whose title matches that condition is automatically treated as high priority during scheduling, even if it was added with a lower priority. This prevents health-critical tasks from being bumped by convenience tasks.
+
+**Conflict detection**
+After greedy scheduling, `Scheduler.detect_conflicts()` scans the final task list and emits two levels of warning — neither stops the program:
+
+- `CONFLICT` — the same pet has more than one task assigned to the same named slot.
+- `WARNING` — tasks for different pets share a slot, meaning the owner would need to be in two places at once.
+
+Warnings appear at the bottom of the plan output under "Conflicts detected."
+
+**Filtering and sorting utilities**
+Two helper methods make it easy to inspect the task pool without generating a full plan:
+
+- `Scheduler.sort_by_time()` — returns tasks ordered by slot (morning → afternoon → evening → unslotted).
+- `Scheduler.filter_tasks(pet_name, completed)` — returns a filtered subset by pet and/or completion status.
+
 ### Suggested workflow
 
 1. Read the scenario carefully and identify requirements and edge cases.
