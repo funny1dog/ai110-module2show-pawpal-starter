@@ -1,26 +1,82 @@
-# PawPal+ (Module 2 Project)
+# PawPal+
 
-You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+A smart pet care scheduling assistant built with Python and Streamlit. PawPal+ helps pet owners build a realistic daily care plan by sorting tasks into time slots, respecting each pet's health needs, skipping tasks that are not yet due, and warning about scheduling conflicts — all without crashing when things go wrong.
 
-## Scenario
+---
 
-A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
+## 📸 Demo
 
-- Track pet care tasks (walks, feeding, meds, enrichment, grooming, etc.)
-- Consider constraints (time available, priority, owner preferences)
-- Produce a daily plan and explain why it chose that plan
+![PawPal+ Streamlit app](demo.png)
 
-Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
+---
 
-## What you will build
+## Features
 
-Your final app should:
+### Multi-pet household support
 
-- Let a user enter basic owner + pet info
-- Let a user add/edit tasks (duration + priority at minimum)
-- Generate a daily schedule/plan based on constraints and priorities
-- Display the plan clearly (and ideally explain the reasoning)
-- Include tests for the most important scheduling behaviors
+Register multiple pets under one owner profile. Each pet maintains its own task list. Tasks are tagged with the pet's name and flow into a single unified daily plan via `Owner.all_tasks()`.
+
+### Time-slot sorting
+
+Every task is assigned a `time_slot`: `morning`, `afternoon`, `evening`, or `any`. The scheduler always orders tasks chronologically — morning before afternoon before evening — regardless of the order they were added. The `Scheduler.sort_by_time()` method also lets you preview this order before generating a full plan.
+
+### Multi-factor priority ranking
+
+The scheduler sorts tasks by a five-key rule before scheduling:
+
+1. **Time slot** — morning tasks run first
+2. **Frequency** — daily tasks take precedence over weekly ones in the same slot
+3. **Effective priority** — high before medium before low (with special-needs boost applied)
+4. **Category** — health → nutrition → exercise → grooming → enrichment
+5. **Duration** — shorter tasks break ties within the same category
+
+### Special-needs priority boost
+
+If a pet has a condition listed in `special_needs` (e.g. `"joint supplement"`), any task whose title matches is automatically promoted to high priority during scheduling — even if it was created as medium or low. This prevents health-critical tasks from being bumped by lower-stakes activities.
+
+### Daily and weekly recurrence
+
+Tasks carry a `frequency` (`daily` or `weekly`) and a `last_done` date. Before building the plan, `Task.is_due_today()` checks whether each task has already been completed within its recurrence window:
+
+- **Daily** tasks are due if `last_done` was yesterday or earlier.
+- **Weekly** tasks are due if `last_done` was 7 or more days ago.
+
+Tasks not yet due are excluded from the schedule and listed separately as "Skipped (not due today)."
+
+### Automatic next occurrence
+
+Calling `Scheduler.complete_task(title)` marks a task done and immediately replaces it with a fresh copy for its next cycle. The new task's `next_due` date is calculated precisely using Python's `timedelta`:
+
+- `daily` → `next_due = today + 1 day`
+- `weekly` → `next_due = today + 7 days`
+
+The task pool size stays constant — the completed entry is swapped out, not duplicated.
+
+### Greedy time-budget scheduling
+
+After sorting, the scheduler fits as many tasks as possible within `owner.available_minutes` using a greedy algorithm: tasks are added to the plan in priority order until no more fit. Tasks that exceed the remaining budget are placed in a "Skipped (didn't fit)" list.
+
+### Conflict detection
+
+After scheduling, `Scheduler.detect_conflicts()` scans the final task list for two types of overlap — neither warning stops the program:
+
+- **CONFLICT** — the same pet has more than one task in the same named time slot.
+- **WARNING** — tasks for different pets share a slot, meaning the owner would need to handle both simultaneously.
+
+Tasks with `time_slot="any"` are excluded from conflict checks since they have no fixed time.
+
+### Task filtering
+
+`Scheduler.filter_tasks(pet_name, completed)` returns a filtered view of the task pool without modifying it. Both parameters are optional and can be combined:
+
+- Filter by pet name to see only one animal's tasks.
+- Filter by completion status (`True` / `False`) to separate done and pending work.
+
+### Transparent plan reasoning
+
+Every generated plan includes a `reasoning` string that explains which sorting rules were applied, which tasks were boosted by special needs, how many tasks fit, and how many were skipped. This is displayed in the UI under "How this plan was built."
+
+---
 
 ## Getting started
 
@@ -30,6 +86,12 @@ Your final app should:
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+```
+
+### Run the app
+
+```bash
+streamlit run app.py
 ```
 
 ## Smarter Scheduling
