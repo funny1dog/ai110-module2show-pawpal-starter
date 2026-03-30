@@ -12,18 +12,6 @@
         ],
         "tasks": [
           {
-            "title": "Morning Walk",
-            "pet": "Mochi",
-            "time_slot": "morning",
-            "duration_minutes": 30,
-            "priority": "high",
-            "category": "exercise",
-            "frequency": "daily",
-            "completed": false,
-            "last_done": null,
-            "next_due": null
-          },
-          {
             "title": "Joint Supplement",
             "pet": "Mochi",
             "time_slot": "morning",
@@ -32,8 +20,8 @@
             "category": "health",
             "frequency": "daily",
             "completed": false,
-            "last_done": null,
-            "next_due": null
+            "last_done": "2026-03-30",
+            "next_due": "2026-03-31"
           },
           {
             "title": "Morning walk",
@@ -44,8 +32,20 @@
             "category": "general",
             "frequency": "daily",
             "completed": false,
-            "last_done": null,
-            "next_due": null
+            "last_done": "2026-03-30",
+            "next_due": "2026-03-31"
+          },
+          {
+            "title": "Morning Walk",
+            "pet": "Mochi",
+            "time_slot": "morning",
+            "duration_minutes": 30,
+            "priority": "high",
+            "category": "exercise",
+            "frequency": "daily",
+            "completed": false,
+            "last_done": "2026-03-30",
+            "next_due": "2026-03-31"
           }
         ]
       },

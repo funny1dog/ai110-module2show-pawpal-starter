@@ -10,12 +10,13 @@ PRIORITY_EMOJI = {"high": "🔴 High", "medium": "🟡 Medium", "low": "🟢 Low
 SLOT_EMOJI = {"morning": "🌅 morning", "afternoon": "☀️ afternoon", "evening": "🌙 evening", "any": "🔄 any"}
 
 def task_rows(tasks):
-    """Return display-ready dicts with priority and slot emoji for st.dataframe."""
+    """Return display-ready dicts with priority, slot, and completion emoji for st.dataframe."""
     rows = []
     for t in tasks:
         d = t.to_dict()
         d["priority"] = PRIORITY_EMOJI.get(t.priority, t.priority)
         d["time_slot"] = SLOT_EMOJI.get(t.time_slot, t.time_slot)
+        d["completed"] = "✅ Done" if t.completed else "⬜ Pending"
         rows.append(d)
     return rows
 
@@ -146,6 +147,39 @@ if all_tasks:
                 st.info(msg)
 else:
     st.info("No tasks added yet.")
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# Complete Tasks
+# ---------------------------------------------------------------------------
+st.subheader("Complete Tasks")
+
+all_tasks_for_complete = st.session_state.owner.all_tasks()
+if all_tasks_for_complete:
+    st.caption("Check a task to mark it complete. Recurring tasks will auto-schedule their next occurrence.")
+    for task in all_tasks_for_complete:
+        PRIORITY_ICON = {"high": "🔴", "medium": "🟡", "low": "🟢"}
+        recurring_badge = " 🔁" if task.frequency in ("daily", "weekly") else ""
+        label = (
+            f"{PRIORITY_ICON.get(task.priority, '')} {task.title} "
+            f"({task.pet_name}) — {task.duration_minutes} min{recurring_badge}"
+        )
+        checked = st.checkbox(label, value=task.completed, key=f"complete_{task.title}_{task.pet_name}")
+        if checked and not task.completed:
+            # Find the pet that owns this task
+            pet = next(p for p in st.session_state.owner.pets if p.name == task.pet_name)
+            if task.frequency in ("daily", "weekly"):
+                # Replace with next occurrence so the task reappears when due
+                next_task = task.next_occurrence()
+                pet.remove_task(task.title)
+                pet.add_task(next_task)
+            else:
+                task.mark_complete()
+            save_data(st.session_state.owner)
+            st.rerun()
+else:
+    st.info("No tasks to complete yet.")
 
 st.divider()
 
