@@ -170,6 +170,8 @@ When AI first suggested the conflict detection logic, it flagged every slot with
 
 The suggestion was evaluated by walking through a concrete example manually: if Mochi has a 10-minute feeding and a 30-minute walk both in the morning, that is not a conflict — it is a sequential plan. A conflict is only meaningful when the owner would have to do both *simultaneously*, which only happens when two tasks have *no room between them* or when the total minutes in a slot exceed what one person can reasonably manage. The final implementation was adjusted to distinguish between same-pet multitasking (a real conflict) and cross-pet overlap (a softer warning), and the test suite was used to confirm the boundary behaved correctly before the change was accepted.
 
+A second judgment call arose during the task-completion UI work. The AI's first implementation called `task.mark_complete()` for all task types. This was technically correct for one-off tasks but wrong for recurring ones — completing a daily feeding task should create a replacement due tomorrow, not leave a permanently-done entry in the list. The fix required understanding that the UI needed to mirror the same `next_occurrence()` + `remove_task()` + `add_task()` pattern already used by `Scheduler.complete_task()` in the backend, rather than taking a simpler path that would silently break recurrence. Manual testing caught this before it could affect saved data.
+
 ---
 
 ## 4. Testing and Verification
@@ -184,10 +186,13 @@ These tests matter because the scheduling logic is the core value of the app —
 
 Confidence in the backend logic is high — the 27 tests exercise both the happy paths and the most likely failure modes, and all pass consistently. Confidence in the end-to-end system is moderate, because the Streamlit UI layer has no automated tests. A user could, for example, add two pets with the same name, or generate a schedule before adding any tasks, and those paths are only guarded by `st.warning` calls rather than tested assertions.
 
+One concrete bug was found and fixed during manual UI testing: the "Complete Tasks" checkbox called `task.mark_complete()` for all task types, but recurring tasks require `task.next_occurrence()` + `pet.remove_task()` + `pet.add_task()` to replace the completed entry with a future one. Without this, completing a daily feeding task left it permanently marked done with no replacement — it would never reappear in future schedules. A second display bug was also caught: the `completed` column in `st.dataframe` rendered as a raw `True`/`False` boolean, which was hard to read and inconsistent across Streamlit versions. Replacing it with `✅ Done` / `⬜ Pending` strings made the state immediately visible.
+
 Edge cases to test next if time allowed:
 
 - A `Pet` whose `special_needs` list contains a string that partially but not exactly matches a task title (e.g. `"supplement"` vs. `"Joint Supplement"`).
 - `generate_plan()` called when `all_tasks()` returns tasks that have already been added to a previous scheduler instance — verifying no cross-contamination.
+- The task completion UI flow end-to-end: completing a recurring task, verifying the replacement appears in the Task Inspector with `⬜ Pending`, and confirming the next `generate_plan()` call excludes it until `next_due` arrives.
 - The UI flow end-to-end using a tool like Playwright or Streamlit's own testing utilities.
 
 ---

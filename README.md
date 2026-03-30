@@ -72,6 +72,25 @@ Tasks with `time_slot="any"` are excluded from conflict checks since they have n
 - Filter by pet name to see only one animal's tasks.
 - Filter by completion status (`True` / `False`) to separate done and pending work.
 
+### Task completion with automatic recurrence
+
+The "Complete Tasks" section in the UI lets owners mark any task done with a single checkbox. The behaviour differs by task type:
+
+- **Recurring tasks** (`daily` / `weekly`): the completed task is removed from the pet's list and immediately replaced with a fresh copy. Its `next_due` date is set via `timedelta` (`today + 1 day` or `today + 7 days`), so it reappears in the schedule exactly when it is due again.
+- **One-off tasks**: marked `completed=True` and kept in the list as a permanent record.
+
+Each checkbox label includes a `🔁` badge for recurring tasks and a priority colour dot so the owner knows what kind of task they are completing.
+
+### Visual status indicators
+
+Every task table in the UI uses emoji to make status immediately readable at a glance — no need to scan boolean columns:
+
+- **Priority**: 🔴 High · 🟡 Medium · 🟢 Low
+- **Time slot**: 🌅 Morning · ☀️ Afternoon · 🌙 Evening · 🔄 Any
+- **Completion**: ✅ Done · ⬜ Pending
+
+The same emoji palette is used in the CLI output produced by `main.py` via the `tabulate` library (rounded-outline tables), so both interfaces stay consistent.
+
 ### Transparent plan reasoning
 
 Every generated plan includes a `reasoning` string that explains which sorting rules were applied, which tasks were boosted by special needs, how many tasks fit, and how many were skipped. This is displayed in the UI under "How this plan was built."
@@ -124,6 +143,12 @@ Two helper methods make it easy to inspect the task pool without generating a fu
 - `Scheduler.sort_by_time()` — returns tasks ordered by slot (morning → afternoon → evening → unslotted).
 - `Scheduler.filter_tasks(pet_name, completed)` — returns a filtered subset by pet and/or completion status.
 
+**Task completion and recurrence in the UI**
+Checking a task in the "Complete Tasks" section triggers different logic depending on frequency. Recurring tasks are replaced with their next occurrence via `task.next_occurrence()` + `pet.remove_task()` + `pet.add_task()` — keeping the pet's task list at a constant size. One-off tasks are marked `completed=True` in place. All changes are persisted immediately to `data.json` and the UI reruns to reflect the updated state.
+
+**Structured CLI output**
+`main.py` uses the `tabulate` library to render every task list as a rounded-outline table with emoji columns for slot, priority, category, and completion status — matching the visual language of the Streamlit UI.
+
 ## Testing PawPal+
 
 ### Running the tests
@@ -149,9 +174,9 @@ All 27 tests should pass in under a second.
 
 The core scheduling logic — sorting, recurrence, conflict detection, and priority boosting — is fully covered by tests that exercise both happy paths and edge cases. The rating is not 5 stars because the following areas are not yet tested:
 
-- The Streamlit UI layer (`app.py`) has no automated tests; UI behaviour is verified manually only.
+- The Streamlit UI layer (`app.py`) has no automated tests; UI behaviour is verified manually only. This includes the "Complete Tasks" checkbox flow and the visual status indicator rendering.
 - `DailyPlan.display()` formatting is spot-checked in one test but not exhaustively.
-- Database or file persistence is not implemented, so there are no persistence tests.
+- `save_data` / `load_data` persistence is exercised by the app at runtime but has no dedicated automated tests.
 
 ---
 
@@ -178,7 +203,10 @@ The full test suite (33 tests) was written by the agent after describing the thr
 **Phase 5 — UI wiring**
 `app.py` was updated to wire every new backend method (`sort_by_time`, `filter_tasks`, `detect_conflicts`, `effort_score`) into visible Streamlit components. The agent read the existing UI before making changes and preserved the session-state pattern already in use.
 
-**Phase 6 — Documentation**
+**Phase 6 — UI polish and bug fixing**
+Two UI issues were identified and fixed. First, a "Complete Tasks" section was added with per-task checkboxes. The agent correctly distinguished recurring from one-off tasks: recurring tasks require `next_occurrence()` + `remove_task()` + `add_task()` rather than a simple `mark_complete()` call, otherwise the task list shrinks and no future occurrence is created. Second, the `task_rows()` display helper was updated to convert the raw `completed` boolean to `✅ Done` / `⬜ Pending` strings, making completion status visible at a glance regardless of Streamlit version. The CLI output in `main.py` was also upgraded to use `tabulate` with matching emoji columns.
+
+**Phase 7 — Documentation**
 The README, `reflection.md`, and all docstrings were drafted or completed by the agent with awareness of the actual implemented code — so the documentation matches what the code does rather than what was originally planned.
 
 ### How the developer directed Agent Mode
